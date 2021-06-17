@@ -41,7 +41,7 @@ char TxDataBuffer[32] =
 { 0 };
 char RxDataBuffer[1] =
 { 0 };
-char ShowHz[1] =
+char ShowHz[32] =
 { 0 } ;
 enum _state
 {
@@ -52,6 +52,7 @@ enum _state
 	State_menu_2
 
 };
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -60,13 +61,14 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 int StateDisplay = 0 ;
 int Datain = 0;
-int SpeedHz = 0 ;
-uint16_t LED2 = 0 ;
-uint32_t Timestmp = 0  ;
-uint32_t ButtonTimestamp = 0 ;
-GPIO_PinState BlueButton[2] ;
+int8_t SpeedHz = 0 ;
+uint32_t LED2 = 0 ;
+
 int CheckLED = 1 ;
 int CheckButton = 0 ;
+
+float T = 0 ;
+int f = 1 ;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -76,6 +78,7 @@ static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 void UARTRecieveAndResponsePolling();
 int16_t UARTRecieveIT();
+void Hz();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -96,7 +99,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -113,6 +116,10 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+  uint32_t Timestmp = 0  ;
+  uint32_t ButtonTimestamp = 0 ;
+  GPIO_PinState BlueButton[2] ;
+int point = 0 ;
 //  {
 //  char temp[]="HELLO WORLD\r\n please type something to test UART\r\n";
 //  HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
@@ -145,38 +152,8 @@ int main(void)
 		/*This section just simmulate Work Load*/
 //		HAL_Delay(100);
 //		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-		if(CheckButton == 1)
-		{
-			if(HAL_GetTick() - ButtonTimestamp >= 100 )
-			{
-				ButtonTimestamp = HAL_GetTick() ;
-				BlueButton[0] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) ;
-				if(BlueButton[1] == GPIO_PIN_SET && BlueButton[0] == GPIO_PIN_RESET)
-				{
-					{
-					char temp[]="if button press\r\n";
-					HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
-					}
-				}
-				if(BlueButton[0] == GPIO_PIN_SET && BlueButton[1] == GPIO_PIN_RESET)
-				{
-					{
-					char temp[]="unpress\r\n";
-					HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
-					}
-				}
-			BlueButton[1] = BlueButton[0] ;
-			}
-		}
-		if(CheckLED == 1)
-		{
-			if(HAL_GetTick() - Timestmp > LED2)
-			{
-				Timestmp = HAL_GetTick() ;
-				HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 
-			}
-		}
+
 		switch (StateDisplay) {
 			case State_start:
 				StateDisplay = State_menu ;
@@ -215,12 +192,20 @@ int main(void)
 						char temp[]="MENU 0 : LED Control\r\n";
 						HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),100);
 						}
+						{
+						char temp[]=" press a : Speed Up +1 Hz\r\n press s : Speed Up -1 Hz\r\n press d : ON/OFF LED 2\r\n press x : exit\r\n";
+						HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),100);
+						}
 						RxDataBuffer[0] = 0 ;
 						StateDisplay = State_menu_1 ;
 						break;
 					case 49 : //1
 						{
 						char temp[]="MENU 1 : buttonstate\r\n";
+						HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),100);
+						}
+						{
+						char temp[]=" press x : exit\r\n Show Button status press bluebutton\r\n";
 						HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),100);
 						}
 						RxDataBuffer[0] = 0 ;
@@ -242,33 +227,30 @@ int main(void)
 					case 0:
 						break;
 					case 97 : //a
+						f = f + 1 ;
+						sprintf(ShowHz, "frequency %d Hz \r\n", f);
+						HAL_UART_Transmit(&huart2, (uint8_t*)ShowHz, strlen(ShowHz), 1000);
 						RxDataBuffer[0] = 0 ;
-						SpeedHz += 1 ;
-
-						//LED2 = (SpeedHz*1000)/2 ;
-						sprintf(ShowHz, " frequency [%d] Hz", SpeedHz);
-						HAL_UART_Transmit(&huart2, (uint8_t*)ShowHz, strlen(TxDataBuffer), 100);
-
 						StateDisplay = State_menu_1 ;
 						break ;
 					case 115 : //s
-						SpeedHz = SpeedHz - 1 ;
-						if(SpeedHz == -1)
-						{SpeedHz = 0 ;}
-						//LED2 = (SpeedHz*1000)/2 ;
-						sprintf(ShowHz, " frequency [%d] Hz", SpeedHz);
-						HAL_UART_Transmit(&huart2, (uint8_t*)ShowHz, strlen(TxDataBuffer), 100);
+
+						f = f - 1 ;
+						sprintf(ShowHz, "frequency %d Hz\r\n", f);
+						HAL_UART_Transmit(&huart2, (uint8_t*)ShowHz, strlen(ShowHz), 1000);
+
 						RxDataBuffer[0] = 0 ;
 						StateDisplay = State_menu_1 ;
 
 						break ;
 					case 100 : //d
-						HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+						//HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 						if(HAL_GPIO_ReadPin(LD2_GPIO_Port, LD2_Pin) == GPIO_PIN_SET)
 						{
-							CheckLED = 1;
+							CheckLED = 0;
+							HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 							{
-							char temp[]="LED2 ON\r\n";
+							char temp[]="LED2 OFF\r\n";
 							HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
 							}
 							RxDataBuffer[0] = 0 ;
@@ -276,9 +258,10 @@ int main(void)
 						}
 						else
 						{
-							CheckLED = 0 ;
+							CheckLED = 1 ;
 							{
-							char temp[]="LED2 off\r\n";
+							HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+							char temp[]="LED2 ON\r\n";
 							HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
 							}
 							RxDataBuffer[0] = 0 ;
@@ -318,6 +301,7 @@ int main(void)
 						HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
 						}
 						RxDataBuffer[0] = 0 ;
+						CheckButton =0 ;
 						StateDisplay = State_menu ;
 						break;
 					default:
@@ -326,14 +310,54 @@ int main(void)
 						HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
 						}
 						RxDataBuffer[0] = 0 ;
-						StateDisplay = State_menu_1 ;
+						StateDisplay = State_menu_2 ;
 						break;
 					}
 
 
 				break;
 
+
+		}//switch
+
+		if(CheckLED == 1)
+		{
+			T = f*1000 ;
+			LED2 = T / 2 ;
+			if(HAL_GetTick() - Timestmp >LED2)
+			{
+				Timestmp = HAL_GetTick() ;
+				HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+
+			}
 		}
+		if(CheckButton == 1)
+			{
+				if(HAL_GetTick() - ButtonTimestamp >= 100 )
+				{
+					ButtonTimestamp = HAL_GetTick() ;
+					BlueButton[0] = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) ;
+					if(BlueButton[1] == GPIO_PIN_SET && BlueButton[0] == GPIO_PIN_RESET)
+					{
+						{
+						char temp[]="if button press\r\n";
+						HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
+						}
+						point = 1 ;
+					}
+					if(point == 1)
+					if(BlueButton[0] == GPIO_PIN_SET && BlueButton[1] == GPIO_PIN_RESET)
+					{
+						{
+						char temp[]="unpress\r\n";
+						HAL_UART_Transmit(&huart2, (uint8_t*)temp, strlen(temp),10);
+						}
+						point =0;
+					}
+				BlueButton[1] = BlueButton[0] ;
+				}
+			}
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -481,6 +505,17 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	//	sprintf(TxDataBuffer, "Received:[%s]\r\n", RxDataBuffer);
 //	HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 
+
+}
+void Hz()
+{
+	f = f - 1 ;
+
+
+//						if(SpeedHz == -1)
+//						{SpeedHz = 0 ;}
+//	sprintf(ShowHz, "frequency[%d]Hz", f);
+//	HAL_UART_Transmit(&huart2, (uint8_t*)ShowHz, strlen(ShowHz), 1000);
 
 }
 /* USER CODE END 4 */
